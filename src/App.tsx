@@ -6,7 +6,6 @@ const state: any = {};
 
 function writeMemory(value: Uint8Array): number {
   const region = (instance.exports.allocate as Function)(value.length);
-  // console.log("regionToWrite", region, value.length);
   const memory = new Uint8Array(
     (instance.exports.memory as WebAssembly.Memory).buffer
   );
@@ -20,11 +19,6 @@ function writeMemory(value: Uint8Array): number {
   if (cap < value.length) {
     throw Error(`Error allocating ${value.length} bytes, got only ${cap}`);
   }
-
-  // const len = new DataView(memory.buffer).getUint32(region + 8, true);
-  // console.log("ptr", ptr, "cap", cap, "len", len);
-
-  // TODO check cap & len
 
   for (let i = 0; i < value.length; i++) {
     memory[ptr + i] = value[i];
@@ -49,7 +43,6 @@ function readMemory(region: number): Uint8Array {
   const ptr = new DataView(memory.buffer).getUint32(region, true);
   const cap = new DataView(memory.buffer).getUint32(region + 4, true);
   const len = new DataView(memory.buffer).getUint32(region + 8, true);
-  // console.log("ptr", ptr, "cap", cap, "size", size);
 
   return memory.slice(ptr, ptr + len);
 }
