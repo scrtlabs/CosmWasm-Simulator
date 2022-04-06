@@ -4,7 +4,7 @@ import { txs } from "./txs";
 let instance: WebAssembly.Instance;
 const state: any = {};
 
-function writeMemory(value: Uint8Array): number {
+function memoryWrite(value: Uint8Array): number {
   const region = (instance.exports.allocate as Function)(value.length);
   const memory = new Uint8Array(
     (instance.exports.memory as WebAssembly.Memory).buffer
@@ -33,7 +33,7 @@ function writeMemory(value: Uint8Array): number {
   return region;
 }
 
-function readMemory(region: number): Uint8Array {
+function memoryRead(region: number): Uint8Array {
   const memory = new Uint8Array(
     (instance.exports.memory as WebAssembly.Memory).buffer
   );
@@ -51,18 +51,18 @@ function readMemory(region: number): Uint8Array {
   const importObject = {
     env: {
       db_read: (key_ptr: number): number => {
-        const key = fromUtf8(readMemory(key_ptr));
+        const key = fromUtf8(memoryRead(key_ptr));
 
         console.log("db_read", key);
 
         const value = state[key];
 
-        return writeMemory(toUtf8(value));
+        return memoryWrite(toUtf8(value));
       },
 
       db_write: (key_ptr: number, value_ptr: number) => {
-        const key = fromUtf8(readMemory(key_ptr));
-        const value = fromUtf8(readMemory(value_ptr));
+        const key = fromUtf8(memoryRead(key_ptr));
+        const value = fromUtf8(memoryRead(value_ptr));
 
         console.log("db_write", key, value);
 
@@ -70,7 +70,7 @@ function readMemory(region: number): Uint8Array {
       },
 
       db_remove: (key_ptr: number) => {
-        const key = fromUtf8(readMemory(key_ptr));
+        const key = fromUtf8(memoryRead(key_ptr));
 
         console.log("db_remove", key);
 
@@ -88,7 +88,7 @@ function readMemory(region: number): Uint8Array {
       },
 
       addr_validate: (source_ptr: number): number => {
-        console.log("addr_validate", fromUtf8(readMemory(source_ptr)));
+        console.log("addr_validate", fromUtf8(memoryRead(source_ptr)));
         return 0;
       },
 
@@ -98,14 +98,14 @@ function readMemory(region: number): Uint8Array {
       ): number => {
         console.log(
           "addr_canonicalize",
-          fromUtf8(readMemory(source_ptr)),
+          fromUtf8(memoryRead(source_ptr)),
           destination_ptr
         );
         return 0;
       },
 
       addr_humanize: (source_ptr: number, destination_ptr: number): number => {
-        console.log("addr_humanize", readMemory(source_ptr), destination_ptr);
+        console.log("addr_humanize", memoryRead(source_ptr), destination_ptr);
         return 0;
       },
 
@@ -169,11 +169,11 @@ function readMemory(region: number): Uint8Array {
       },
 
       debug: (source_ptr: number) => {
-        console.log("debug", fromUtf8(readMemory(source_ptr)));
+        console.log("debug", fromUtf8(memoryRead(source_ptr)));
       },
 
       query_chain: (request: number): number => {
-        console.log("query_chain", fromUtf8(readMemory(request)));
+        console.log("query_chain", fromUtf8(memoryRead(request)));
 
         return 0;
       },
@@ -197,9 +197,9 @@ function readMemory(region: number): Uint8Array {
 
       for (const tx of txs) {
         const msg = JSON.stringify(tx.msg);
-        const msgPtr = writeMemory(toUtf8(msg));
-        const envPtr = writeMemory(toUtf8(JSON.stringify(tx.env)));
-        const infoPtr = writeMemory(toUtf8(JSON.stringify(tx.info)));
+        const msgPtr = memoryWrite(toUtf8(msg));
+        const envPtr = memoryWrite(toUtf8(JSON.stringify(tx.env)));
+        const infoPtr = memoryWrite(toUtf8(JSON.stringify(tx.info)));
 
         console.log("input", tx.type, msg);
 
@@ -209,7 +209,7 @@ function readMemory(region: number): Uint8Array {
           msgPtr
         );
 
-        console.log("output", fromUtf8(readMemory(resultRegion)));
+        console.log("output", fromUtf8(memoryRead(resultRegion)));
 
         console.log("state", state);
       }
