@@ -30,43 +30,43 @@ type Tx = {
 export const txs: Tx[] = [];
 
 for (const rawTx of rawTxs) {
-  // Assume everything is in msg index 0 (I checked)
-  // TODO just loop over all msgs and skip if not init or exec
-  const msgIndex = 0;
+  for (let msgIndex = 0; msgIndex < rawTx.tx.body.messages.length; msgIndex++) {
+    // Msg Type
+    let type: "instantiate" | "execute" = "instantiate";
+    if (
+      rawTx.tx.body.messages[msgIndex]["@type"] ===
+      "/cosmwasm.wasm.v1.MsgExecuteContract"
+    ) {
+      type = "execute";
+    }
 
-  // Msg Type
-  let type: "instantiate" | "execute" = "instantiate";
-  if (
-    rawTx.tx.body.messages[msgIndex]["@type"] ===
-    "/cosmwasm.wasm.v1.MsgExecuteContract"
-  ) {
-    type = "execute";
+    // Find contract address on init too
+    const contractAddress = rawTx.logs[msgIndex].events
+      .find((e) =>
+        e.attributes.find((attr) => attr.key === "_contract_address")
+      )!
+      .attributes.find((attr) => attr.key === "_contract_address")!.value;
+
+    txs.push({
+      type,
+      msg: rawTx.tx.body.messages[msgIndex].msg,
+      env: {
+        block: {
+          height: Number(rawTx.height),
+          time: `${new Date(rawTx.timestamp).getTime()}000000`, // ms to ns since unix epoch
+          chain_id: "juno-1",
+        },
+        transaction: {
+          index: msgIndex,
+        },
+        contract: {
+          address: contractAddress,
+        },
+      },
+      info: {
+        sender: rawTx.tx.body.messages[msgIndex].sender,
+        funds: rawTx.tx.body.messages[msgIndex].funds,
+      },
+    });
   }
-
-  // Find contract address on init too
-  const contractAddress = rawTx.logs[msgIndex].events
-    .find((e) => e.attributes.find((attr) => attr.key === "_contract_address"))!
-    .attributes.find((attr) => attr.key === "_contract_address")!.value;
-
-  txs.push({
-    type,
-    msg: rawTx.tx.body.messages[msgIndex].msg,
-    env: {
-      block: {
-        height: Number(rawTx.height),
-        time: `${new Date(rawTx.timestamp).getTime()}000000`, // ms to ns since unix epoch
-        chain_id: "juno-1",
-      },
-      transaction: {
-        index: msgIndex,
-      },
-      contract: {
-        address: contractAddress,
-      },
-    },
-    info: {
-      sender: rawTx.tx.body.messages[msgIndex].sender,
-      funds: rawTx.tx.body.messages[msgIndex].funds,
-    },
-  });
 }

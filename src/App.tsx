@@ -1,4 +1,9 @@
-import { fromUtf8, toUtf8 } from "secretjs";
+import { fromBase64, fromUtf8, toUtf8 } from "secretjs";
+import {
+  MsgRevoke,
+  MsgGrant,
+} from "secretjs/dist/protobuf_stuff/cosmos/authz/v1beta1/tx";
+import { GenericAuthorization } from "secretjs/dist/protobuf_stuff/cosmos/authz/v1beta1/authz";
 import { txs } from "./txs";
 
 let instance: WebAssembly.Instance;
@@ -191,7 +196,7 @@ function memoryRead(region: number): Uint8Array {
       fn query(env_ptr: u32, msg_ptr: u32) -> u32;
    */
 
-  WebAssembly.instantiateStreaming(fetch("/184.wasm"), importObject).then(
+  WebAssembly.instantiateStreaming(fetch("/578.wasm"), importObject).then(
     (wasm) => {
       instance = wasm.instance;
 
@@ -209,7 +214,72 @@ function memoryRead(region: number): Uint8Array {
           msgPtr
         );
 
-        console.log("output", fromUtf8(memoryRead(resultRegion)));
+        const output = fromUtf8(memoryRead(resultRegion));
+        const outputJSON = JSON.parse(output);
+        console.log("output", output);
+
+        for (const { msg } of outputJSON.ok.messages) {
+          console.log("output msg", msg);
+
+          if (msg?.stargate?.value) {
+            if (msg?.stargate?.type_url === "/cosmos.authz.v1beta1.MsgGrant") {
+              const x = MsgGrant.decode(fromBase64(msg?.stargate?.value));
+              if (x?.grant?.authorization?.value) {
+                // @ts-expect-error
+                x.grant.authorization.value = GenericAuthorization.decode(
+                  x.grant.authorization.value
+                );
+              }
+
+              console.log("output msg protobuf", JSON.stringify(x, null, 4));
+            } else if (
+              msg?.stargate?.type_url === "/cosmos.authz.v1beta1.MsgRevoke"
+            ) {
+              console.log(
+                "output msg protobuf",
+                JSON.stringify(
+                  MsgRevoke.decode(fromBase64(msg?.stargate?.value)),
+                  null,
+                  4
+                )
+              );
+            } else {
+              console.log(
+                "cannot decode output msg protobuf - needs protobuf definitions",
+                JSON.stringify(msg?.stargate)
+              );
+            }
+          }
+        }
+
+        console.log("state", state);
+
+        const replyMsg = JSON.stringify({
+          id: 2,
+          result: {
+            ok: {
+              events: [],
+              data: "",
+            },
+          },
+        });
+
+        const replyMsgPtr = memoryWrite(toUtf8(replyMsg));
+        const replyEnvPtr = memoryWrite(toUtf8(JSON.stringify(tx.env)));
+        // const infoPtr = memoryWrite(toUtf8(JSON.stringify(tx.info)));
+
+        // @ts-ignore
+        tx.type = "reply";
+
+        console.log("input", tx.type, replyMsg);
+
+        const replyResultRegion = (wasm.instance.exports[tx.type] as Function)(
+          replyEnvPtr,
+          // infoPtr,
+          replyMsgPtr
+        );
+
+        console.log("output", fromUtf8(memoryRead(replyResultRegion)));
 
         console.log("state", state);
       }
